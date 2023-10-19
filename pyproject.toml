@@ -1,0 +1,29 @@
+[project]
+name = "GMClustering"
+version = "0.1.0"
+authors = [
+  { name="James Edmond", email="edmondandy795@gmail.com" },
+]
+description = "Uses a pipeline of unsupervised methods to partition global magnetospheric data from MMS and THEMIS measurements"
+readme = "README.md"
+requires-python = ">=3.7"
+license = { file = "LICENSE.txt" } 
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "scikit-learn",
+    "xpysom",
+]
+
+[tool.flit.metadata]
+module = "gmclustering"
+
+[tool.flit.source-files]
+include = "src"
+
