@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
+import pkg_resources
 
 
 
@@ -363,10 +364,6 @@ def hist1d_vars(dat, preds, logx=None, hist_vars=None, fig_kws=None):
 
 
 def load_example_data():
-    
-    pkg_path = os.path.dirname( os.path.realpath(__file__) )
-    abs_path = os.path.abspath(
-                    os.path.join(pkg_path, '../../res/data/mms1_2017.csv')
-                             )
-    return pd.read_csv(abs_path)
+    stream = pkg_resources.resource_stream(__name__, 'data/mms1_2017.csv')
+    return pd.read_csv(stream)
     

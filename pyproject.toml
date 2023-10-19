@@ -6,7 +6,7 @@ authors = [
 ]
 description = "Uses a pipeline of unsupervised methods to partition global magnetospheric data from MMS and THEMIS measurements"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.5"
 license = { file = "LICENSE.txt" } 
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -14,18 +14,34 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-[tool.poetry.dependencies]
-python = "^3.5"
-numpy = "1.24.3"
-pandas = "2.0.3"
-scipy = "1.11.1"
-sklearn = "1.3.0"
-xpysom = "1.0.7"
+dependencies = [
+    "numpy==1.24.3",
+    "pandas==2.0.3",
+    "scipy==1.11.1",
+    "scikit-learn==1.3.0",
+    "xpysom==1.0.7",
+    "matplotlib==3.8.0",
+    "seaborn==0.12.2",
+    "tqdm==4.66.1",
+]
 
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
 
-[tool.flit.metadata]
-module = "gmclustering"
+#[tool.setuptools.packages.find]
+#where = ["src"]
+#
+#[tool.setuptools.package-data]
+#mypkg = ["*.csv", "*.pkl"]
 
-[tool.flit.source-files]
-include = "src"
+[tool.setuptools.packages.find]
+# scanning for namespace packages is true by default in pyproject.toml, so
+# you do NOT need to include the following line.
+namespaces = true
+where = ["src"]
+
+[tool.setuptools.package-data]
+"gmclustering.data" = ["*.csv"]
+"gmclustering.models" = ["*.pkl"]
 

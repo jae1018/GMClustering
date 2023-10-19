@@ -77,9 +77,8 @@ class GMClustering:
     
     def __init__(self):
         
-        pkg_path = os.path.dirname( os.path.realpath(__file__) )
-        abspath = os.path.abspath( os.path.join(pkg_path, '../../res/models/') )
-        self.model_folder = abspath
+        stream = pkg_resources.resource_filename(__name__, 'models')
+        self.model_folder = stream
         self.load_models()
         self.node_mask = np.full( self.som_weights_2d().shape[0], True )
         self.current_dist = GMClustering.default_aggclust_dist
