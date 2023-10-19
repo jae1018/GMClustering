@@ -13,13 +13,15 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-dependencies = [
-    "numpy",
-    "pandas",
-    "scipy",
-    "scikit-learn",
-    "xpysom",
-]
+
+[tool.poetry.dependencies]
+python = "^3.5"
+numpy = "1.24.3"
+pandas = "2.0.3"
+scipy = "1.11.1"
+sklearn = "1.3.0"
+xpysom = "1.0.7"
+
 
 [tool.flit.metadata]
 module = "gmclustering"
