@@ -353,7 +353,8 @@ class GMClustering:
                              + 'vars: ' + str(GMClustering.init_vars))
         
         # calculate derived params
-        data_with_derived_vars = GMClustering._calculate_derived_params(data)
+        init_vars = GMClustering.init_vars
+        data_with_derived_vars = GMClustering._calculate_derived_params(data[init_vars])
         
         # prepare data for pca by applying transforms and rescalings
         scaled_data = self._prepare_data_for_pca(data_with_derived_vars)
