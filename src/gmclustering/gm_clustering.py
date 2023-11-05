@@ -24,7 +24,7 @@ from tqdm import tqdm
 
 
 
-
+"""
 def engineer_features(df,
                       scalar_labels = None,
                       log_scalar    = None):
@@ -53,7 +53,7 @@ def engineer_features(df,
         
     
     return new_df
-        
+"""
 
 
 
@@ -70,6 +70,9 @@ class GMClustering:
     derived_vars = ['p', 'beta', 'MA']
     
     log_vars = [ 'T', 'n', 'p', 'beta', 'MA' ]
+    
+    yj_vars = ['BX', 'BY',' BZ',
+               'VX', 'VY',' VZ']
     
     default_aggclust_kws = {'linkage'    : 'ward',
                             'n_clusters' : None}
@@ -94,9 +97,10 @@ class GMClustering:
     
     def load_models(self):
         
+        self.yj_trans = self._load_model('yj_trans.pkl')
         self.init_scaler = self._load_model('init_scaler.pkl')
-        self.init_pca = self._load_model('pca.pkl')
-        self.post_pca_scaler = self._load_model('post_pca_scaler.pkl')
+        self.pca = self._load_model('pca.pkl')
+        self.post_pca_scaler = self._load_model('postpca_scaler.pkl')
         self.som = self._load_model('som.pkl')
         
         
@@ -143,6 +147,7 @@ class GMClustering:
         return new_df
     
     
+    """
     def dimensional_expansion(df):
         
         scalar_labels = [ 'T','n','beta','p','MA' ]
@@ -156,6 +161,35 @@ class GMClustering:
             model_df[var] = np.log10( model_df[var] )
         
         return model_df
+    """
+    
+    def prepare_data_for_pca(self, df):
+        """
+        Prepares df for pca transform by
+        -- log10 scaling scalar variables
+        -- yj-transforming the log10 of square of vector components
+        -- MinMax scaling the results
+
+        Parameters
+        ----------
+        df : Pandas dataframe containing derived vars
+
+        Returns
+        -------
+        dataframe to be fed to pca
+        """
+        scaled_df = df.copy(deep=True)
+        # log10 scaling of scalar data
+        log_vars = GMClustering.log_vars
+        scaled_df[log_vars] = np.log10( scaled_df[log_vars] )
+        # yj-trans of log10 of square of vector components
+        yj_vars = GMClustering.yj_vars
+        scaled_df[yj_vars] = np.log10( scaled_df[yj_vars]**2 )
+        scaled_df = self.yj_trans.transform( scaled_df[yj_vars] )
+        return pd.DataFrame(self.init_scaler.transform( scaled_df ),
+                            columns = list(scaled_df))
+        
+        
     
     
     def som_cluster_mapper(self, data_for_som, cmodel_preds):
@@ -180,17 +214,18 @@ class GMClustering:
         return final_preds
     
     
-    def scaled_embeddings(self, dim_exp_data):
+    def apply_pca(self, df_for_pca):
+        """
+        Applies PCA (and post-PCA rescaling) to data
+        
+        Return
+        ------
+        numpy array
+        """
         # rescale and pca transform data      
-        trimmed_scaled_data = self.post_pca_scaler.transform(
-                                self.init_pca.transform(
-                                    pd.DataFrame(
-                                        self.init_scaler.transform(dim_exp_data),
-                                        columns = list(dim_exp_data)
-                                                )
-                                                        )
-                                                                    )
-        return trimmed_scaled_data
+        return self.post_pca_scaler.transform(
+                        self.pca.transform( df_for_pca )
+                                              )
         
     
     
@@ -263,6 +298,7 @@ class GMClustering:
         num_batches = int( data.shape[0] / rows_per_batch )
         if num_batches == 0: num_batches += 1
         
+        """
         processed_data = []
         for chunk in tqdm( np.array_split(data[GMClustering.init_vars],
                                           num_batches,
@@ -278,9 +314,17 @@ class GMClustering:
         
             # get (scaled) embeddings from autoencoder
             processed_data.append( self.scaled_embeddings( dim_exp_data ) )
-        
-        # get AggClust predictions of SOM nodes 
+            
         return np.vstack(processed_data)
+        """
+        
+        scaled_data = self.prepare_data_for_pca(data)
+        
+        postpca_data = self.apply_pca(scaled_data)
+        
+        return postpca_data
+        
+        
     
     
     
@@ -398,12 +442,11 @@ class GMClustering:
     
     
     def predict(self, data,
-                      dist           = None,
-                      rows_per_batch = None):
+                      dist           = None):
         
         scaled_embeds = self.prepare_data_for_som(
                                 data,
-                                rows_per_batch = rows_per_batch
+                                #rows_per_batch = rows_per_batch
                                                  )
         
         # get AggClust predictions of SOM nodes 
