@@ -4,7 +4,6 @@
 # basic packages
 import pickle
 import os
-import itertools
 import pkg_resources
 
 # computational packages
@@ -12,48 +11,11 @@ import numpy as np
 import pandas as pd
 from sklearn.cluster import AgglomerativeClustering
 from scipy.cluster.hierarchy import linkage
-from scipy.cluster.hierarchy import dendrogram
 
 # visualization packages
+from scipy.cluster.hierarchy import dendrogram
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-
-# etc
-from tqdm import tqdm
-
-
-
-
-"""
-def engineer_features(df,
-                      scalar_labels = None,
-                      log_scalar    = None):
-    
-    
-    
-    def build_duo_scalar_combos(df_, vars_, log_scalar=None):
-        if log_scalar is None: log_scalar = True
-        
-        duo_combos = list(itertools.combinations(vars_,2))
-        for combo in duo_combos:
-            comp1, comp2 = combo
-            
-            func = (lambda x: x) if not log_scalar else np.log10
-            
-            # product (X*Y)
-            df_[comp1+'*'+comp2] = func( df_[comp1] * df_[comp2] )
-            # ratio (X/Y)
-            df_[comp1+'/'+comp2] = func( df_[comp1] / df_[comp2] )
-
-    
-    new_df = df.copy(deep=True)
-        
-    build_duo_scalar_combos(new_df, scalar_labels)
-    #build_triple_scalar_combos(new_df, scalar_labels)
-        
-    
-    return new_df
-"""
 
 
 
@@ -76,13 +38,14 @@ class GMClustering:
     
     default_aggclust_kws = {'linkage'    : 'ward',
                             'n_clusters' : None}
+    
     default_aggclust_dist = 3
     
     def __init__(self):
         
         stream = pkg_resources.resource_filename(__name__, 'models')
         self.model_folder = stream
-        self.load_models()
+        self._load_models()
         self.node_mask = np.full( self.som_weights_2d().shape[0], True )
         self.current_dist = GMClustering.default_aggclust_dist
         self.prepare_aggclust()
@@ -95,7 +58,9 @@ class GMClustering:
     
     
     
-    def load_models(self):
+    
+    
+    def _load_models(self):
         
         self.yj_trans = self._load_model('yj_trans.pkl')
         self.init_scaler = self._load_model('init_scaler.pkl')
@@ -105,8 +70,24 @@ class GMClustering:
         
         
         
-    def calculate_derived_params(df):
         
+        
+    def _calculate_derived_params(df):
+        
+        """
+        Calculates the additional variables needed for clustering
+        from the original variables
+        
+        Input
+        -----
+        df: pandas dataframe with original variables
+        
+        Returns
+        -------
+        dataframe deep-copy with including derived variables
+        """
+        
+        # make deep copy
         new_df = df.copy(deep=True)
         
         # constants
@@ -114,6 +95,7 @@ class GMClustering:
         mu_0 = 4 * np.pi * 10**(-7)
         boltz_k = 1.380649 * 10**(-23)   # boltzmann constant in J/K
         kelvins_per_eV = 11604.51812
+        
         # values from df
         density_numPcc = new_df['n'].values
         density_numPm3 = density_numPcc * (100**3)   # N/(cm^3) --> N/(m^3)
@@ -121,6 +103,7 @@ class GMClustering:
         b_field_magnitude_nT = np.sqrt( (new_df[['BX','BY','BZ']]**2).sum(axis=1) )
         b_field_magnitude_T = b_field_magnitude_nT * (10**-9)    # nT --> Tesla
         speed_kmPs = np.sqrt( (new_df[['VX','VY','VZ']]**2).sum(axis=1) )
+        
         # calculate pressure (nPa)
         pressure_nPa = ( density_numPm3
                          * boltz_k
@@ -128,42 +111,31 @@ class GMClustering:
                          * kelvins_per_eV   # Kelvins / eV
                          * 10**9 )   # Pascals --> nanoPascals
         new_df['p'] = pressure_nPa
+        
         # calculate plasma beta
         new_df['beta'] = (
             ( pressure_nPa * 10**-9 )   # nPa --> Pa
                 /
             (  b_field_magnitude_T**2 / (2 * mu_0)  )
                             )
+        
         # calculate alfven speed (m/s)
         alfven_speed_mps = (
                 b_field_magnitude_T
                         /
                 np.sqrt( mu_0 * m_ion * density_numPm3 )
                             )
-        #new_df['VA'] = alfven_speed_mps
+        
         # calculate alfven mach number
         new_df['MA'] = speed_kmPs * 1000 / alfven_speed_mps
         
         return new_df
+
+
+
     
     
-    """
-    def dimensional_expansion(df):
-        
-        scalar_labels = [ 'T','n','beta','p','MA' ]
-        model_df = engineer_features(df,
-                                     log_scalar = True,
-                                     scalar_labels = scalar_labels)
-        del model_df['T*n']   # pressure
-        del model_df['T/p']   # 1/(k*density)
-        del model_df['n/p']   # 1/(k*temp)
-        for var in GMClustering.log_vars:
-            model_df[var] = np.log10( model_df[var] )
-        
-        return model_df
-    """
-    
-    def prepare_data_for_pca(self, df):
+    def _prepare_data_for_pca(self, df):
         """
         Prepares df for pca transform by
         -- log10 scaling scalar variables
@@ -192,8 +164,24 @@ class GMClustering:
         
     
     
-    def som_cluster_mapper(self, data_for_som, cmodel_preds):
-       
+    def _som_cluster_mapper(self, data_for_som,
+                                  cmodel_preds):
+        """
+        Propagate cluster predictions of SOM nodes to data
+
+        Parameters
+        ----------
+        data_for_som : numpy array
+            array of data already prepared for SOM
+        cmodel_preds : 1d numpy array
+            cluster predictions of SOM nodes
+
+         Returns
+         -------
+         1d numpy array of cluster predictions of data
+         """
+        
+        # Get dict of som nodes to data indices
         som_preds = self.som.labels_map(data_for_som,
                                         np.arange(data_for_som.shape[0]))
         newdict = {}
@@ -214,7 +202,10 @@ class GMClustering:
         return final_preds
     
     
-    def apply_pca(self, df_for_pca):
+    
+    
+    
+    def _apply_pca(self, df_for_pca):
         """
         Applies PCA (and post-PCA rescaling) to data
         
@@ -222,21 +213,47 @@ class GMClustering:
         ------
         numpy array
         """
-        # rescale and pca transform data      
+        # rescale and pca-transform data      
         return self.post_pca_scaler.transform(
                         self.pca.transform( df_for_pca )
                                               )
         
     
     
+    
+    
     def som_weights_2d(self):
+        """
+        Get weights of SOM as 2d matrix where rows are nodes and columns
+        are their features
+
+        Returns
+        -------
+        2d numpy array
+        """
         num_neurons = np.prod( self.som._weights.shape[:2] )
         shape_2d = (num_neurons, self.som._weights.shape[2] )
         return self.som._weights.reshape(shape_2d)
     
     
     
-    def aggclust_predictions_on_som_nodes(self, dist = None):
+    
+    
+    def _aggclust_predictions_on_som_nodes(self, dist = None):
+        """
+        Get hierarchical clustering predictions of SOM nodes
+
+        Parameters
+        ----------
+        dist : float, optional
+            Distance used for hierarchical clustering partitioning
+            If None, default dist is used 
+
+        Returns
+        -------
+        1d numpy array of integers representing cluster predictions
+        (nodes that are masked out are assigned a cluster int of -1)
+        """
         if dist is None: dist = self.aggclust.distance_threshold
         
         aggclust_kws = { **GMClustering.default_aggclust_kws,
@@ -255,30 +272,55 @@ class GMClustering:
     
     
     
-    def dendrogram(self, dendrogram_kws = None,
-                         fig_kws        = None,
-                         ax             = None):
+    def plot_dendrogram(self, dendrogram_kws = None,
+                              fig_kws        = None,
+                              ax             = None):
+        """
+        Create a dendrogram showing the merge-order of the hierarhical clusters
+        of SOM nodes. If any nodes have been masked out using prepare_aggclust,
+        they will not be factored into the dendrogram.
+
+        Parameters
+        ----------
+        dendrogram_kws : dict of keywords, optional
+            keywords for scipy.cluster.hierarchy.dendrogram function
+        fig_kws : dict of keywords, optional
+            keywords used when creating figure object containing plot
+        ax : matplotlib axis instance
+            If None, figure and axis will be created
+
+        Returns
+        -------
+        (fig, ax) tuple
+        fig and ax are figure and axis instance used to create plot
+        """
+        
         if dendrogram_kws is None: dendrogram_kws = {}
         default_dendrogram_kws = {'color_threshold':0}
         dendrogram_kws = { **default_dendrogram_kws, **dendrogram_kws }
         
         if fig_kws is None: fig_kws = {'figsize':(6,6)}
         
+        # Create figure if axis is None
         if ax is None:
             fig, ax = plt.subplots(1,1,**fig_kws)
         else:
             fig = plt.gcf()
         
+        # Get linkage matrix of masked-in SOM nodes
         linkage_matrix = linkage(
                     self.som_weights_2d()[self.node_mask],
                     method = GMClustering.default_aggclust_kws['linkage']
                                 )
         max_dist = self.aggclust.distances_.max()
+        
+        # Show dendrogram with grid lines
         dendrogram(linkage_matrix, ax=ax, **dendrogram_kws)
         for vert_val in np.arange(0.5, int(max_dist)+0.5, step=0.5):
             ax.axhline(vert_val, ls='solid', c='grey', alpha=0.5)
         ax.xaxis.set_ticklabels([])
         
+        # Show distance threshold used for clustering solution
         dist = self.aggclust.distance_threshold
         ax.axhline(dist, ls='dashed', c='black')
         
@@ -286,7 +328,23 @@ class GMClustering:
     
     
     
-    def prepare_data_for_som(self, data, rows_per_batch = None):
+    def _prepare_data_for_som(self, data):
+        """
+        Prepares data for feeding into trained self-organizing map
+
+        Parameters
+        ----------
+        data : pandas dataframe containing the original variables
+
+        Raises
+        ------
+        ValueError: If data does not contain the needed variables
+
+        Returns
+        -------
+        postpca_data : numpy array
+            Array of PCA-projected data
+        """
         
         # Check that data contains necessary vars
         num_init_vars = np.sum( np.isin(list(data), GMClustering.init_vars) )
@@ -294,33 +352,14 @@ class GMClustering:
             raise ValueError('data does not contain all of the necessary '
                              + 'vars: ' + str(GMClustering.init_vars))
         
-        if rows_per_batch is None: rows_per_batch = data.shape[0]
-        num_batches = int( data.shape[0] / rows_per_batch )
-        if num_batches == 0: num_batches += 1
+        # calculate derived params
+        data_with_derived_vars = GMClustering._calculate_derived_params(data)
         
-        """
-        processed_data = []
-        for chunk in tqdm( np.array_split(data[GMClustering.init_vars],
-                                          num_batches,
-                                          axis=0) ):
+        # prepare data for pca by applying transforms and rescalings
+        scaled_data = self._prepare_data_for_pca(data_with_derived_vars)
         
-            # calculate extra params before dim expansion
-            df_with_derived_params = GMClustering.calculate_derived_params(chunk)
-            
-            # do dimensional expansion to capture deeper correlations
-            dim_exp_data = \
-                GMClustering.dimensional_expansion( df_with_derived_params )
-            dim_exp_data = dim_exp_data[ self.init_scaler.feature_names_in_ ]
-        
-            # get (scaled) embeddings from autoencoder
-            processed_data.append( self.scaled_embeddings( dim_exp_data ) )
-            
-        return np.vstack(processed_data)
-        """
-        
-        scaled_data = self.prepare_data_for_pca(data)
-        
-        postpca_data = self.apply_pca(scaled_data)
+        # apply pca and rescale post-pca results
+        postpca_data = self._apply_pca(scaled_data)
         
         return postpca_data
         
@@ -328,17 +367,30 @@ class GMClustering:
     
     
     
-    def som_hits(self, data,
-                       ax             = None,
-                       rows_per_batch = None,
-                       pcolor_kws     = None):
+    def plot_som_hits(self, data,
+                            ax         = None,
+                            pcolor_kws = None):
+        """
+        Plot the number of hits per node as a greyscale matrix
+
+        Parameters
+        ----------
+        data : dataframe to compute hits for
+        ax : matplotlib axis instance
+            If None, figure and axis will be created
+        pcolor_kws : Dict of keywords for matplotlib.pcolor
+
+        Returns
+        -------
+        (fig, ax) tuple
+        fig and ax are figure and axis instance used to create plot
+        """
         
         if pcolor_kws is None: pcolor_kws = {}
         default_pcolor_kws = {'cmap':'gray'}
         pcolor_kws = { **default_pcolor_kws, **pcolor_kws }
         
-        som_dat = self.prepare_data_for_som(data,
-                                            rows_per_batch = rows_per_batch)
+        som_dat = self._prepare_data_for_som(data)
         
         ind_map = self.som.labels_map(som_dat, np.arange(som_dat.shape[0]))
         # massage into standard dict form, avoiding python Counter objects
@@ -362,16 +414,39 @@ class GMClustering:
     
     
     
+    
+    
     def som_shape(self):
+        """
+        Returns 2d shape of SOM as 2-element integer tuple
+        """
         return ( self.som._neigx.max()+1, self.som._neigy.max()+1 )
 
 
 
-    def som_clust(self, dist       = None,
-                        ax         = None):
+
+
+    def plot_som_clust(self, dist = None,
+                             ax   = None):
+        """
+        Create grid of SOM nodes colored according to clustering solution
+
+        Parameters
+        ----------
+        dist : float, optional
+            Distance used for hierarchical clustering partitioning
+            If None, default dist is used 
+        ax : matplotlib axis instance, optional
+            If None, figure and axis will be created
+
+        Returns
+        -------
+        (fig, ax) tuple
+        fig and ax are figure and axis instance used to create plot
+        """
         
         cmodel_preds = \
-            self.aggclust_predictions_on_som_nodes(dist = dist)
+            self._aggclust_predictions_on_som_nodes(dist = dist)
         
         # Setup fig if not given
         if ax is None:
@@ -385,10 +460,6 @@ class GMClustering:
             colors.insert( 0, 'black')
         colors = colors[:len(np.unique(cmodel_preds))]
         cmap = mcolors.ListedColormap(colors)
-    
-        #ax.pcolor( cmodel_preds.reshape(self.som_shape()).T,
-        #           cmap       = cmap,
-        #           **pcolor_kws)
         
         som_shape = self.som_shape()
         ref = ax.imshow( cmodel_preds.reshape(som_shape).T,
@@ -406,11 +477,37 @@ class GMClustering:
         
         
      
+        
+     
     def prepare_aggclust(self, dist   = None,
                                subset = None):
-        
         """
-        Subset is tuple / list of tuples of (distance_threshold, cluster)
+        Prepare the hierarchical clustering model for clustering SOM nodes
+        
+        To get sub-clustering solutions, use subset keyword. Data that does
+        not belong to the sub-clustering of interest will be masked out
+        in future calculations and plots.
+        
+        Sub-Clustering Example
+        ----------------------
+        If interested in analyzing, for example, the 3rd cluster after a
+        truncation distance of 2.5 was used, then subset would be:
+        subset = (2.5, 3), or subset = [ (2.5, 3) ]
+        If wanted to analysize further subgroups beyond that, say the
+        2nd cluster after a distance of 1, then the full subset keyword 
+        would be:
+        subset = [ (2.5, 3), (1, 2) ]
+
+        Parameters
+        ----------
+        dist : float, optional
+            Distance used to partition nodes of SOM
+        subset : tuple or list of tuples, optional
+            Used to analyze sub-clusters of the resulting clustering
+
+        Returns
+        -------
+        None.
         """
         
         if dist is None: dist = GMClustering.default_aggclust_dist
@@ -441,19 +538,35 @@ class GMClustering:
     
     
     
+    
+    
     def predict(self, data,
-                      dist           = None):
+                      dist = None):
+        """
+        Make predictions of data. The hierarchical clustering predictions of
+        SOM nodes are propagated to the data that the nodes represent.
         
-        scaled_embeds = self.prepare_data_for_som(
-                                data,
-                                #rows_per_batch = rows_per_batch
-                                                 )
-        
+        If prepare_aggclust was used to investigate sub-clusters, data
+        not belonging to the subgroup of interest will be assigned
+        a cluster value of -1.
+
+        Parameters
+        ----------
+        data : pandas dataframe containing necessary vars for clustering
+        dist : float, optional
+            distance threshold used to partition SOM nodes.
+            If None, default value is used
+
+        Returns
+        -------
+        1d numpy array of integers representing cluster predictions
+        """
+        # Transform data into form usable for SOM
+        scaled_embeds = self._prepare_data_for_som( data )
         # get AggClust predictions of SOM nodes 
-        cmodel_preds = \
-            self.aggclust_predictions_on_som_nodes(dist = dist)
-            
-        return self.som_cluster_mapper(scaled_embeds, cmodel_preds)
+        cmodel_preds = self._aggclust_predictions_on_som_nodes(dist = dist)
+        # Propagate clustering som predictions to data
+        return self._som_cluster_mapper(scaled_embeds, cmodel_preds)
         
         
         
