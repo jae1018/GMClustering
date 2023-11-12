@@ -38,7 +38,7 @@ class GMClustering:
     default_aggclust_kws = {'linkage'    : 'ward',
                             'n_clusters' : None}
     
-    default_aggclust_dist = 2
+    default_aggclust_dist = 1.5
     
     def __init__(self):
         
