@@ -27,13 +27,13 @@ class GMClustering:
     
     #yj_vars = [ 'BX', 'BY', 'BZ',
     #            'VX', 'VY', 'VZ' ]
-    init_vector_vars = [ 'BX', 'BY', 'BZ', 'B',
-                         'VX', 'VY', 'VZ', 'V' ]
+    init_vector_vars = [ 'BX', 'BY', 'BZ',
+                         'VX', 'VY', 'VZ', ]
     init_scalar_vars = [ 'n', 'T' ]
     #derived_vars = [ 'p', 'beta', 'MA' ]
-    derived_vars = ['mom_X', 'mom_Y', 'mom_Z']
+    derived_vars = ['mom_X', 'mom_Y', 'mom_Z', 'B', 'V']
     init_vars = [ *init_vector_vars, *init_scalar_vars ]
-    log_vars = [ *init_scalar_vars, *derived_vars ]
+    log_vars = [ *init_scalar_vars, 'mom_X', 'mom_Y', 'mom_Z' ]
     
     default_aggclust_kws = {'linkage'    : 'ward',
                             'n_clusters' : None}
