@@ -25,21 +25,20 @@ import matplotlib.colors as mcolors
 
 class GMClustering:
     
-    init_vars = [ 'BX', 'BY', 'BZ',
-                  'VX', 'VY', 'VZ',
-                  'T', 'n' ]
-    
-    derived_vars = ['p', 'beta', 'MA']
-    
-    log_vars = [ 'T', 'n', 'p', 'beta', 'MA' ]
-    
-    yj_vars = ['BX', 'BY',' BZ',
-               'VX', 'VY',' VZ']
+    #yj_vars = [ 'BX', 'BY', 'BZ',
+    #            'VX', 'VY', 'VZ' ]
+    init_vector_vars = [ 'BX', 'BY', 'BZ',
+                         'VX', 'VY', 'VZ' ]
+    init_scalar_vars = [ 'n', 'T' ]
+    #derived_vars = [ 'p', 'beta', 'MA' ]
+    derived_vars = ['mom_X', 'mom_Y', 'mom_Z']
+    init_vars = [ *init_vector_vars, *init_scalar_vars ]
+    log_vars = [ *init_scalar_vars, *derived_vars ]
     
     default_aggclust_kws = {'linkage'    : 'ward',
                             'n_clusters' : None}
     
-    default_aggclust_dist = 3
+    default_aggclust_dist = 2
     
     def __init__(self):
         
@@ -52,6 +51,8 @@ class GMClustering:
         
         
     
+    
+    
     def _load_model(self, filename):
         file = open( os.path.join(self.model_folder,filename), 'rb' )
         return pickle.load(file)
@@ -61,8 +62,10 @@ class GMClustering:
     
     
     def _load_models(self):
-        
-        self.yj_trans = self._load_model('yj_trans.pkl')
+        """
+        Load all model components needed for overall model
+        """
+        #self.yj_trans = self._load_model('yj_trans.pkl')
         self.init_scaler = self._load_model('init_scaler.pkl')
         self.pca = self._load_model('pca.pkl')
         self.post_pca_scaler = self._load_model('postpca_scaler.pkl')
@@ -104,6 +107,7 @@ class GMClustering:
         b_field_magnitude_T = b_field_magnitude_nT * (10**-9)    # nT --> Tesla
         speed_kmPs = np.sqrt( (new_df[['VX','VY','VZ']]**2).sum(axis=1) )
         
+        """
         # calculate pressure (nPa)
         pressure_nPa = ( density_numPm3
                          * boltz_k
@@ -128,6 +132,12 @@ class GMClustering:
         
         # calculate alfven mach number
         new_df['MA'] = speed_kmPs * 1000 / alfven_speed_mps
+        """
+        
+        # calculate momentum density
+        new_df['mom_X'] = density_numPcc * np.abs( new_df['VX'].values )
+        new_df['mom_Y'] = density_numPcc * np.abs( new_df['VY'].values )
+        new_df['mom_Z'] = density_numPcc * np.abs( new_df['VZ'].values )
         
         return new_df
 
@@ -155,11 +165,15 @@ class GMClustering:
         log_vars = GMClustering.log_vars
         scaled_df[log_vars] = np.log10( scaled_df[log_vars] )
         # yj-trans of log10 of square of vector components
-        yj_vars = GMClustering.yj_vars
-        scaled_df[yj_vars] = np.log10( scaled_df[yj_vars]**2 )
-        scaled_df = self.yj_trans.transform( scaled_df[yj_vars] )
-        return pd.DataFrame(self.init_scaler.transform( scaled_df ),
-                            columns = list(scaled_df))
+        #yj_vars = GMClustering.yj_vars
+        #scaled_df[yj_vars] = np.log10( scaled_df[yj_vars]**2 )
+        #scaled_df[yj_vars] = self.yj_trans.transform( scaled_df[yj_vars] )
+        # sklearn complains when features are not in original order of fitting
+        orig_var_order = self.init_scaler.feature_names_in_
+        return pd.DataFrame(
+                    self.init_scaler.transform( scaled_df[orig_var_order] ),
+                    columns = list(orig_var_order)
+                            )
         
         
     
@@ -213,9 +227,11 @@ class GMClustering:
         ------
         numpy array
         """
-        # rescale and pca-transform data      
+        # make sure to transform feature in same order as original fitting
+        orig_var_order = self.pca.feature_names_in_
+        # rescale and pca-transform data
         return self.post_pca_scaler.transform(
-                        self.pca.transform( df_for_pca )
+                            self.pca.transform( df_for_pca[orig_var_order] )
                                               )
         
     
@@ -272,6 +288,8 @@ class GMClustering:
     
     
     
+    
+    
     def plot_dendrogram(self, dendrogram_kws = None,
                               fig_kws        = None,
                               ax             = None):
@@ -325,6 +343,8 @@ class GMClustering:
         ax.axhline(dist, ls='dashed', c='black')
         
         return fig, ax
+    
+    
     
     
     
