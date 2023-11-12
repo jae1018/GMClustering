@@ -27,8 +27,8 @@ class GMClustering:
     
     #yj_vars = [ 'BX', 'BY', 'BZ',
     #            'VX', 'VY', 'VZ' ]
-    init_vector_vars = [ 'BX', 'BY', 'BZ',
-                         'VX', 'VY', 'VZ' ]
+    init_vector_vars = [ 'BX', 'BY', 'BZ', 'B',
+                         'VX', 'VY', 'VZ', 'V' ]
     init_scalar_vars = [ 'n', 'T' ]
     #derived_vars = [ 'p', 'beta', 'MA' ]
     derived_vars = ['mom_X', 'mom_Y', 'mom_Z']
@@ -104,8 +104,10 @@ class GMClustering:
         density_numPm3 = density_numPcc * (100**3)   # N/(cm^3) --> N/(m^3)
         temp_eV = new_df['T'].values
         b_field_magnitude_nT = np.sqrt( (new_df[['BX','BY','BZ']]**2).sum(axis=1) )
+        new_df['B'] = b_field_magnitude_nT
         b_field_magnitude_T = b_field_magnitude_nT * (10**-9)    # nT --> Tesla
         speed_kmPs = np.sqrt( (new_df[['VX','VY','VZ']]**2).sum(axis=1) )
+        new_df['V'] = speed_kmPs
         
         """
         # calculate pressure (nPa)
