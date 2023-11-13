@@ -99,8 +99,8 @@ def plot_xy_preds_multimission(df, preds, fig_kws=None, title=None, xy=None):
     for axes_row, sc in zip(axes,['all','themis','mms']):
         
         axes1d = axes_row.flatten()
-        #colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-        colors = plt.get_cmap('brg')( np.linspace(0, 1, num_clust) )
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        #colors = plt.get_cmap('brg')( np.linspace(0, 1, num_clust) )
         
         if sc == 'all':
             sc_mask = np.full(df.shape[0], True)
@@ -176,13 +176,13 @@ def plot_xy_preds(df, preds, fig_kws=None, title=None, xy=None):
     
     fig, axes = plt.subplots(nr, nc, **fig_kws)
     axes1d = axes.flatten()
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-    #colors = plt.get_cmap('brg')( np.linspace(0, 1, num_clust) )
     
     # setup consistent binds
     mins, maxs = modify_xy_bounds(df[xy].values)
     bins = [ np.linspace(mins[i], maxs[i], num=50) for i in range(2) ]
     
+    #colors = color_per_cluster(np.unique(preds))
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     
     #axes1d[0].scatter( df['X'], df['Y'], s=2.5, c=preds )
     for i in range(num_clust):
@@ -219,6 +219,34 @@ def plot_xy_preds(df, preds, fig_kws=None, title=None, xy=None):
     return fig, axes
 
 
+
+
+
+def color_per_cluster(cluster_ints, cmap=None):
+    """
+    Return dict of cluster ints -> colors to be used with each cluster
+
+    Parameters
+    ----------
+    cluster_ints : container of *unique* cluster ints
+
+    Returns
+    -------
+    dict[int:cluster color (str)]
+    """
+    if cmap is None: cmap ='brg'
+    
+    n = len(cluster_ints)
+    if -1 in cluster_ints:
+        colors = ['black'] + plt.get_cmap(cmap)(np.linspace(0, 1, n - 1)).tolist()
+    else:
+        colors = plt.get_cmap(cmap)(np.linspace(0, 1, n)).tolist()
+    
+    colors_dict = {}
+    for c_int, c_int_color in zip(np.sort(cluster_ints), colors):
+        colors_dict[c_int] = c_int_color
+    
+    return colors_dict
 
 
 
