@@ -176,8 +176,8 @@ def plot_xy_preds(df, preds, fig_kws=None, title=None, xy=None):
     
     fig, axes = plt.subplots(nr, nc, **fig_kws)
     axes1d = axes.flatten()
-    #colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-    colors = plt.get_cmap('brg')( np.linspace(0, 1, num_clust) )
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    #colors = plt.get_cmap('brg')( np.linspace(0, 1, num_clust) )
     
     # setup consistent binds
     mins, maxs = modify_xy_bounds(df[xy].values)
