@@ -38,7 +38,7 @@ class GMClustering:
     default_aggclust_kws = {'linkage'    : 'ward',
                             'n_clusters' : None}
     
-    default_aggclust_dist = 1.5
+    default_aggclust_dist = 1.65
     
     def __init__(self):
         
@@ -589,7 +589,7 @@ class GMClustering:
         # get AggClust predictions of SOM nodes 
         cmodel_preds = self._aggclust_predictions_on_som_nodes(dist = dist)
         # Propagate clustering som predictions to data
-        return self._som_cluster_mapper(scaled_embeds, cmodel_preds)
+        return self._som_cluster_mapper(scaled_embeds, cmodel_preds).astype(np.int32)
         
         
         
