@@ -17,9 +17,9 @@ import numpy as np
 
 if __name__ == "__main__":
     
-    
     # get data
     dat = utils.load_example_data()
+    #dat = pd.read_csv('/home/jedmond/Documents/ML_Research/Source/gmclustering/GMClustering/src/gmclustering/data/mms1_2017.csv')
     
     # prepare clustering model
     gmc = GMClustering()
@@ -27,16 +27,16 @@ if __name__ == "__main__":
     # the SOM nodes are static and do not require data to
     # analyze in-of-themselves... so we can go ahead and inspect
     # the clustering solution on the SOM nodes
-    gmc.prepare_aggclust()
-    fig, axes = plt.subplots(1, 2)
-    gmc.som_clust(ax=axes[0])
+    gmc.prepare_aggclust(dist=1.65)
+    fig, axes = plt.subplots(1, 2, figsize=(8,4))
+    gmc.plot_som_clust(ax=axes[0])
     dendrogram_kws = {'truncate_mode':'level', 'p':5}
-    gmc.dendrogram(ax             = axes[1],
-                  dendrogram_kws = dendrogram_kws)
+    gmc.plot_dendrogram(ax             = axes[1],
+                        dendrogram_kws = dendrogram_kws)
     
     # make predictions for mms sample data
     #  .. can process in batches if enough RAM isn't available all at once
-    preds = gmc.predict(dat, rows_per_batch = 10**4)
+    preds = gmc.predict(dat)
     
     # visualize predictions with a histogram over the clusters
     utils.plot_xy_preds(dat, preds,
@@ -60,25 +60,26 @@ if __name__ == "__main__":
     # Subclusters of the original hierarchical clustering solution can
     # be analyzed by invoking prepare_aggclust and specifying
     # the original distance used and cluster to analyze as a tuple
-    # Analyzing the SW cluster (cluster 3) as an example
-    sw_cluster = 3
+    # Analyzing the magsphere cluster (cluster 0) as an example
+    sub_cluster = 0
     original_distance = GMClustering.default_aggclust_dist
-    subset = (original_distance, sw_cluster)
+    subset = (original_distance, sub_cluster)
     gmc.prepare_aggclust(subset=subset)
     
     # Plot the dendrogram for the subclustering solution
     # to inform where to pick the new threshold distance
-    fig, axes = plt.subplots(1, 2)
-    gmc.som_clust(ax=axes[0])
-    gmc.dendrogram(ax             = axes[1],
+    fig, axes = plt.subplots(1, 2, figsize=(8,4))
+    gmc.plot_som_clust(ax=axes[0])
+    gmc.plot_dendrogram(ax             = axes[1],
                    dendrogram_kws = dendrogram_kws)
     
-    # 1.0 seems reasonable
-    gmc.prepare_aggclust(subset=subset, dist=1.0)
-    fig, axes = plt.subplots(1, 2)
-    gmc.som_clust(ax=axes[0])
-    gmc.dendrogram(ax             = axes[1],
-                   dendrogram_kws = dendrogram_kws)
+    # 1.2 seems reasonable
+    sub_dist = 1.2
+    gmc.prepare_aggclust(subset=subset, dist=sub_dist)
+    fig, axes = plt.subplots(1, 2, figsize=(8,4))
+    gmc.plot_som_clust(ax=axes[0])
+    gmc.plot_dendrogram(ax             = axes[1],
+                        dendrogram_kws = dendrogram_kws)
     
     # Get predictions for data based on new clustering solution
     subpreds = gmc.predict(dat)
