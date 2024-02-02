@@ -12,26 +12,37 @@ import pkg_resources
 
 
 
-def merge_clusters(merge_list, preds, nc):
-    
-    clusters_to_merge = [ item for sublist in merge_list for item in sublist ]
-    clusters_to_keep = np.sort( np.setdiff1d( np.arange(nc), clusters_to_merge ) ).tolist()
-    
-    num_clusters_after = len(merge_list) + len(clusters_to_keep)
-    
-    new_preds = np.full(preds.shape[0], -1)
-    cluster_counter = 0
-    for single_merge_list in merge_list:
-        merged_inds = np.hstack( [ np.where(preds == c)[0] for c in single_merge_list ] )
-        new_preds[merged_inds] = cluster_counter
-        cluster_counter += 1
-    
-    for c_kept in clusters_to_keep:
-        inds = np.where(preds == c_kept)[0]
-        new_preds[inds] = cluster_counter
-        cluster_counter += 1
-        
-    return new_preds
+def remap_array(arr, mapping_dict):
+    """
+    Maps cluster ints to different ints. Supports re-mapping either as just a
+    permutation (e.g. [0,1,2] where 0->4, 1->8, 2->3 ==> [4,8,3]) or a
+    reduction in clusters (e.g. [0,1,2,3] where (0,1)->5, 2->7, 3->9 ==> [5,5,7,9]).
+
+    Example
+    -------
+    The following code will take an array of 4-class predictions (with labels
+    0, 1, 2, and 3) and remap them such that 0 and 1 map to 0, 2 maps to 1,
+    and 3 maps to 2.
+    remap_array(preds_arr, {0:[0,1], 1:[2], 2:[3]})
+
+    Parameters
+    ----------
+    arr : 1d numpy array of ints
+        Int array representing cluster affiliation
+    mapping_dict : dict(int->list of ints)
+        dict where keys are new ints and values are old ints that should
+        be replaced
+
+    Returns
+    -------
+    new_arr : 1d numpy array of ints
+        Int array with new cluster affiliations
+    """
+    new_arr = np.zeros(arr.shape[0], dtype=np.int32)
+    for new_value, old_values in mapping_dict.items():
+        for old_value in old_values:
+            new_arr[arr == old_value] = new_value
+    return new_arr
 
 
 
@@ -375,12 +386,13 @@ def hist1d_vars(dat, preds, logx=None, hist_vars=None, fig_kws=None):
         bins = np.linspace( np.min(bg_dat), np.max(bg_dat), 100 )
         ax.hist( bg_dat, bins=bins, alpha=0.5, histtype='step', color='black' )
         ax.set_title(var, fontsize=16)
-        color_dict = {0:0, 1:3, 2:1, 3:2}
+        #color_dict = {0:0, 1:3, 2:1, 3:2}
         for i in np.unique(preds):
             mask = preds == i
             fg_dat = data[mask][var]
             if var in logx: fg_dat = np.log10( fg_dat )
-            color = plt.rcParams['axes.prop_cycle'].by_key()['color'][ color_dict[int(i)] ]
+            #color = plt.rcParams['axes.prop_cycle'].by_key()['color'][ color_dict[int(i)] ]
+            color = plt.rcParams['axes.prop_cycle'].by_key()['color'][ int(i) ]
             ax.hist( fg_dat, bins=bins, alpha=0.5, color=color )
 
     for var, ax in zip(hist_vars,axes):
