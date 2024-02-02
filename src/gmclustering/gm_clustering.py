@@ -93,48 +93,12 @@ class GMClustering:
         # make deep copy
         new_df = df.copy(deep=True)
         
-        # constants
-        m_ion = 1.67 * 10**-27
-        mu_0 = 4 * np.pi * 10**(-7)
-        boltz_k = 1.380649 * 10**(-23)   # boltzmann constant in J/K
-        kelvins_per_eV = 11604.51812
-        
         # values from df
         density_numPcc = new_df['n'].values
-        density_numPm3 = density_numPcc * (100**3)   # N/(cm^3) --> N/(m^3)
-        temp_eV = new_df['T'].values
         b_field_magnitude_nT = np.sqrt( (new_df[['BX','BY','BZ']]**2).sum(axis=1) )
         new_df['B'] = b_field_magnitude_nT
-        b_field_magnitude_T = b_field_magnitude_nT * (10**-9)    # nT --> Tesla
         speed_kmPs = np.sqrt( (new_df[['VX','VY','VZ']]**2).sum(axis=1) )
         new_df['V'] = speed_kmPs
-        
-        """
-        # calculate pressure (nPa)
-        pressure_nPa = ( density_numPm3
-                         * boltz_k
-                         * temp_eV
-                         * kelvins_per_eV   # Kelvins / eV
-                         * 10**9 )   # Pascals --> nanoPascals
-        new_df['p'] = pressure_nPa
-        
-        # calculate plasma beta
-        new_df['beta'] = (
-            ( pressure_nPa * 10**-9 )   # nPa --> Pa
-                /
-            (  b_field_magnitude_T**2 / (2 * mu_0)  )
-                            )
-        
-        # calculate alfven speed (m/s)
-        alfven_speed_mps = (
-                b_field_magnitude_T
-                        /
-                np.sqrt( mu_0 * m_ion * density_numPm3 )
-                            )
-        
-        # calculate alfven mach number
-        new_df['MA'] = speed_kmPs * 1000 / alfven_speed_mps
-        """
         
         # calculate momentum density
         new_df['mom_X'] = density_numPcc * np.abs( new_df['VX'].values )
@@ -166,11 +130,7 @@ class GMClustering:
         # log10 scaling of scalar data
         log_vars = GMClustering.log_vars
         scaled_df[log_vars] = np.log10( scaled_df[log_vars] )
-        # yj-trans of log10 of square of vector components
-        #yj_vars = GMClustering.yj_vars
-        #scaled_df[yj_vars] = np.log10( scaled_df[yj_vars]**2 )
-        #scaled_df[yj_vars] = self.yj_trans.transform( scaled_df[yj_vars] )
-        # sklearn complains when features are not in original order of fitting
+        # ensure proper order of columns
         orig_var_order = self.init_scaler.feature_names_in_
         return pd.DataFrame(
                     self.init_scaler.transform( scaled_df[orig_var_order] ),
@@ -513,13 +473,14 @@ class GMClustering:
         
         Sub-Clustering Example
         ----------------------
-        If interested in analyzing, for example, the 3rd cluster after a
-        truncation distance of 2.5 was used, then subset would be:
-        subset = (2.5, 3), or subset = [ (2.5, 3) ]
-        If wanted to analysize further subgroups beyond that, say the
+        If interested in analyzing, for example, the 3rd cluster (where
+        cluster counting starts from 0) after a truncation distance of 2.5
+        was used, then subset would be:
+          subset = (2.5, 3), or subset = [ (2.5, 3) ]
+        If you wanted to analysize further subgroups beyond that, say the
         2nd cluster after a distance of 1, then the full subset keyword 
         would be:
-        subset = [ (2.5, 3), (1, 2) ]
+          subset = [ (2.5, 3), (1, 2) ]
 
         Parameters
         ----------
@@ -590,6 +551,87 @@ class GMClustering:
         cmodel_preds = self._aggclust_predictions_on_som_nodes(dist = dist)
         # Propagate clustering som predictions to data
         return self._som_cluster_mapper(scaled_embeds, cmodel_preds).astype(np.int32)
+    
+    
+    
+    
+    
+    def predict_magsphere_magsheath_solarwind(self, data):
+        """
+        Make predictions for magnetosheath, magnetosphere, and solar wind.
+        This 3-class model accuracy is about 99.7% on the olshevsky
+        labeled dataset.
+
+        Parameters
+        ----------
+        data : pandas dataframe containing necessary vars for clustering
+
+        Returns
+        -------
+        2-element tuple where
+          0: 1d numpy array of integers representing cluster predictions
+          1: dict(int->str) indicating cluster affiliation
+        """
+        
+        # Reset model
+        self.prepare_aggclust()
+        # Predictions from default model correspond to 3-class predictions
+        return ( self.predict(data),
+                 { 0 : 'magnetosphere',
+                   1 : 'magnetosheath',
+                   2 : 'solar_wind' } )
+        
+    
+    
+    
+    
+    
+    def predict_magsphere_magsheath_foreshock_pristinesolarwind(self, data):
+        """
+        Make predictions for magnetosheath, magnetosphere, pristine solar wind,
+        and ion foreshock
+        
+        Note that this 4-class model accuracy is about 86% (on the olshevsky
+        labeled dataset), so use caution with ion foreshock vs pristine
+        solar wind predictions.
+
+        Parameters
+        ----------
+        data : pandas dataframe containing necessary vars for clustering
+
+        Returns
+        -------
+        2-element tuple where
+          0: 1d numpy array of integers representing cluster predictions
+          1: dict(int->str) indicating cluster affiliation
+        """
+        
+        # Get 3-class predictions (model will be reset)
+        class3_preds, _ = self.predict_magsphere_magsheath_solarwind(data)
+        
+        # Unpack solar wind cluster into two sub-clusters
+        init_sw_cluster_int = 2
+        subset = (self.default_aggclust_dist, init_sw_cluster_int)
+        self.prepare_aggclust(subset=subset)
+        sub_sw_preds = self.predict(data, dist=0.5)
+        
+        # mask out non-solar wind predictions
+        sw_mask = sub_sw_preds != -1
+        
+        # increment sub-sw preds from (0,1) by 2 to (2,3), then assign to
+        # original preds
+        new_preds = np.zeros(data.shape[0], np.int32)
+        # keep original magsphere and magsheath (0 and 1) predictions ...
+        new_preds[~sw_mask] = class3_preds[~sw_mask]
+        # ... but split sw predictions (old 2) to both pristine solar
+        # wind (3) and ion foreshock (new 2)
+        new_preds[sw_mask] = sub_sw_preds[sw_mask] + 2
+        
+        return ( new_preds,
+                 { 0 : 'magnetosphere',
+                   1 : 'magnetosheath',
+                   2 : 'ion_foreshock', 
+                   3 : 'pristine_solar_wind' } )
         
         
         
