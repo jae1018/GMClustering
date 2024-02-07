@@ -559,7 +559,7 @@ class GMClustering:
     def predict_magsphere_magsheath_solarwind(self, data):
         """
         Make predictions for magnetosheath, magnetosphere, and solar wind.
-        This 3-class model accuracy is about 99.7% on the olshevsky
+        This 3-class model accuracy is about 99.4% on the olshevsky
         labeled dataset.
 
         Parameters
@@ -632,6 +632,41 @@ class GMClustering:
                    1 : 'magnetosheath',
                    2 : 'ion_foreshock', 
                    3 : 'pristine_solar_wind' } )
+    
+    
+    
+    
+    
+    def som_activations(self, data):
+        """
+        Creates a dict of node position to index of data, e.g. if the data
+        point at index 5 belongs to node (3,5), then the returned
+        dict will contain something like { (3,5): [5] }. If a
+        node is absent from the dict, then no points mapped to it.
+
+        Parameters
+        ----------
+        data : pandas dataframe containing necessary vars for clustering
+
+        Returns
+        -------
+        dict( 2-element int tuple -> 1d integer numpy array )
+        """
+        
+        # Prepare data for the som
+        dat_for_som = self._prepare_data_for_som( data )
+        
+        # Get dict of som nodes to data indices
+        som_preds = self.som.labels_map( dat_for_som,
+                                         np.arange(dat_for_som.shape[0]) )
+        
+        # Convert from original format to arrays as values
+        node_dict = {}
+        for key in som_preds:
+            node_dict[key] = np.array( list( som_preds[key].keys() ) )
+        
+        return node_dict
+        
         
         
         
