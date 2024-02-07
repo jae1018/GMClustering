@@ -393,6 +393,22 @@ class GMClustering:
         ref = ax.pcolor(hitarr.T, **pcolor_kws)
         fig.colorbar(ref, ax=ax)
         
+        # Add white gridlines to plot to make it sharper
+        som_shape = self.som_shape()
+        for i in range(1,som_shape[0]):
+            for q in range(1,som_shape[1]):
+                ax.axvline(i-0.01, c='white', lw=0.1)  # add tiny shift 
+                ax.axhline(q, c='white', lw=0.1)
+
+        # Shift x and y labels
+        som_x_inds = np.arange(som_shape[0],step=2)
+        ax.set_xticks( som_x_inds+0.5 )
+        ax.set_xticklabels( som_x_inds )
+        
+        som_y_inds = np.arange(som_shape[1],step=2)
+        ax.set_yticks( som_y_inds+0.5 )
+        ax.set_yticklabels( som_y_inds )
+        
         return fig, ax
     
     
