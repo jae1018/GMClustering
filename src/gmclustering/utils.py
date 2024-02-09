@@ -49,6 +49,115 @@ def remap_array(arr, mapping_dict):
 
 
 
+def compare_data_against_clusters(df,
+                                  preds,
+                                  sub_df,
+                                  logx      = None,
+                                  bins      = None, 
+                                  hist_vars = None,
+                                  clusters  = None,
+                                  fig_kws   = None,
+                                  hist_kws  = None):
+    """
+    Compares the distribution of data in sub_df against all data of df
+    belonging to the specified clusters. Can be used for comparing
+    the data of individual nodes against the full cluster distributions.
+
+    Required Parameters
+    -------------------
+    df : pandas dataframe
+        dataframe used to create histograms
+    preds : 1d numpy array of ints
+        Array containing the predictions of each point in df
+    sub_df : pandas dataframe
+        Another dataframe that will be binned against data in df
+    
+    Optional Parameters
+    -------------------
+    logx : list of strs or bool (default False)
+        Used to determine if log10 of feature should be binned. Can specify
+        everything as logx using 'logx = True' or particular feature using
+        'logx = [ my_feature ]'
+    bins : int (default 50)
+        Number of bins for the histogram
+    hist_vars : list of strs, optional (default is first column of df)
+        Features of df that will be plotted
+    clusters : int / list of ints (default 0)
+        The clusters over which data should be separately plotted
+    fig_kws : kwargs dict (default is empty dict)
+        keywords for plt.subplots()
+    hist_kws : kwargs dict (default is {'alpha':0.5, 'density':True})
+        keywords for plt.hist()
+
+    Returns
+    -------
+    2-element tuple of created (fig, axes)
+    """
+    
+    # Pick first var as hist_var if none given
+    if hist_vars is None: hist_vars = [ list(df)[0] ]
+    
+    # default to 0th cluster if none given
+    if clusters is None: clusters = 0
+    if np.issubdtype(type(clusters), np.number): clusters = [ clusters ]
+        
+    # default fig_kws to empty dict
+    if fig_kws is None: fig_kws = {}
+    
+    # default hist_kws to dict
+    if hist_kws is None:
+        hist_kws = {'alpha'   : 0.5,
+                    'density' : True}
+    
+    # default bins
+    if bins is None: bins = 50
+    
+    # Default logx to False; make logx list of hist_vars if set to True
+    if logx is None: logx = False
+    if isinstance(logx, bool):
+        if logx:
+            logx = hist_vars
+        else:
+            logx = []
+    
+    fig, axes = plt.subplots(len(clusters), len(hist_vars), **fig_kws)
+    axes_2d = axes.reshape( (len(clusters), len(hist_vars)) )
+    
+    # Enumerate over clusters first ...
+    for ax_x, clust_int in enumerate(clusters):
+        cluster_df = df[preds == clust_int]
+        
+        # ... then each var given for a cluster
+        for ax_y, var in enumerate(hist_vars):
+            cluster_var_data = cluster_df[var].values
+            sub_var_data = sub_df[var].values
+            
+            if var in logx:
+                cluster_var_data = np.log10(cluster_var_data)
+                sub_var_data = np.log10(sub_var_data)
+            
+            bin_max = max( [ cluster_var_data.max(), sub_var_data.max() ] )
+            bin_min = min( [ cluster_var_data.min(), sub_var_data.min() ] )
+            var_bins = np.linspace(bin_min, bin_max, num=bins)
+            
+            ax = axes_2d[ax_x,ax_y]
+            ax.hist( cluster_var_data, bins=var_bins, **hist_kws)
+            ax.hist( sub_var_data, bins=var_bins, **hist_kws)
+            
+            # set ylabel if first column of axes
+            if ax_y == 0:
+                ax.set_ylabel(clust_int)
+            
+            # set xlabel if last row of axes
+            if ax_x == len(clusters) - 1:
+                ax.set_xlabel(var)
+    
+    return fig, axes
+
+
+
+
+
 
 def modify_xy_bounds(xy, margin=None):
     if margin is None: margin = 0.05
