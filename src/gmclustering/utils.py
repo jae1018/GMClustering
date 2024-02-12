@@ -9,6 +9,84 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import pkg_resources
+from tqdm import tqdm
+
+
+
+
+def find_crossings_with_times(times,
+                              predictions,
+                              window_size = None,
+                              max_deltaT  = None):
+    """
+    Finds changes in classification (a "crossing") in a time series. Only
+    crossings with half a window length before all belonging to one class and
+    half a window length ahead all belonging to another, and with a maximum
+    time gap between prediction changes of max_deltaT are kept.
+    
+    Crossings are returned as part of a dict with tuples as keys, e.g.
+        { (1,2) : [0, 50, 100],
+          (2,1) : [25, 75] }
+    means that crossings going from cluster 1 to 2 were found at row indices
+    0, 50, and 100 and crossings going from cluster 2 to 1 were found at
+    row indices 25 and 75.
+
+    Parameters
+    ----------
+    times : Pandas series of Timestamps
+        Series of times of measurements
+    predictions : 1d numpy integer array
+        Array of integer predictions
+    window_size : Pandas Timedelta
+        Window length used to check predictions
+    max_deltaT : Pandas Timedelta
+        Max time allowed between two measurements in when considering a
+        change in predictoins to be a crossing.
+
+    Returns
+    -------
+    dict( (2-element int tuples) -> row index of point just before crossing )
+    """
+    if window_size is None:
+        window_size = (times[1:] - times[:-1]).median() * 5
+    if max_deltaT is None:
+        max_deltaT = (times[1:] - times[:-1]).median() * 3
+    
+    crossings = []
+    cross_dict = {}
+    
+    # Calculate consecutive differences in predictions
+    diff_predictions = np.diff(predictions)
+    
+    # Find where consecutive differences indicate a crossing
+    crossing_indices = np.where(diff_predictions != 0)[0]
+    
+    # Convert crossing indices to corresponding timestamps
+    for idx in tqdm(crossing_indices):
+        
+        # find window start / end with binary search
+        window_start = np.searchsorted(times, times[idx] - window_size/2, side='right')
+        window_end = np.searchsorted(times, times[idx+1] + window_size/2, side='right')
+        
+        # confirm half window length before all belongs to one cluster and
+        # half window length ahead belongs to another
+        pre_crossing_all_same = np.all( predictions[window_start:idx+1] == predictions[idx] )
+        post_crossing_all_same = np.all( predictions[idx+1:window_end+1] == predictions[idx+1] )
+        
+        # check that adjacent crossing points have time diff <= max time allowed
+        no_large_time_skip = (times[idx+1] - times[idx]) <= max_deltaT
+        
+        if pre_crossing_all_same and post_crossing_all_same and no_large_time_skip:
+            
+            class_tuple = (predictions[idx], predictions[idx+1])
+            
+            if class_tuple not in cross_dict:
+                cross_dict[class_tuple] = [ idx ]
+            else:
+                cross_dict[class_tuple].append( idx )
+    
+    return cross_dict
+
 
 
 
