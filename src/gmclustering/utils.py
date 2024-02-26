@@ -6,6 +6,7 @@
 import seaborn as sns
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import pandas as pd
 import os
 import pkg_resources
@@ -449,11 +450,15 @@ def color_per_cluster(cluster_ints, cmap=None):
 
 
 
-def time_series(dat, preds, trange=None, sc=None, fig_kws=None):
-    if sc is None: sc = 'tha'    
-    sc_mask = dat['spacecraft'] == sc
+def time_series(dat, preds, trange=None, sc=None,
+                fig_kws=None, node_dict=None,
+                identify_nodes=None, show_posit=None):
+    if node_dict is None: node_dict = {}
+    if identify_nodes is None: identify_nodes = []
+    if show_posit is None: show_posit = False
     
-    if fig_kws is None: fig_kws = {'figsize':(8,8)}
+    if sc is None: sc = 'tha'
+    sc_mask = dat['spacecraft'] == sc
     
     if trange is None:
         start = pd.to_datetime( dat[sc_mask]['time'].iloc[0] )
@@ -463,9 +468,23 @@ def time_series(dat, preds, trange=None, sc=None, fig_kws=None):
     trange_mask = ( pd.to_datetime( dat[sc_mask]['time'] ) >= trange[0] ) \
                   & ( pd.to_datetime( dat[sc_mask]['time'] ) <= trange[1] )
     
-    #fig, axes = plt.subplots(6, 2, figsize=(8,10))
+    if fig_kws is None:
+        fig_kws = {'figsize':(8,10)}
+    # Create figure and subplots
     fig = plt.figure(**fig_kws)
-    grid_size = (5,1)
+
+    # Define grid for subplots
+    grid_shape = (5, 4) if show_posit else (5, 2)
+    ax1 = plt.subplot2grid(grid_shape, (0, 0), rowspan=1, colspan=2)
+    ax2 = plt.subplot2grid(grid_shape, (1, 0), rowspan=1, colspan=2)
+    ax3 = plt.subplot2grid(grid_shape, (2, 0), rowspan=1, colspan=2)
+    ax4 = plt.subplot2grid(grid_shape, (3, 0), rowspan=1, colspan=2)
+    ax5 = plt.subplot2grid(grid_shape, (4, 0), rowspan=1, colspan=2)
+
+    # Scatter plots
+    if show_posit:
+        ax6 = plt.subplot2grid(grid_shape, (0, 2), rowspan=2, colspan=2)
+        ax7 = plt.subplot2grid(grid_shape, (2, 2), rowspan=2, colspan=2)
     
     subdat = dat[sc_mask][trange_mask]
     subpreds = preds[sc_mask][trange_mask]
@@ -478,62 +497,140 @@ def time_series(dat, preds, trange=None, sc=None, fig_kws=None):
     subdat = subdat.iloc[sort_inds]
     subpreds = subpreds[sort_inds]
     
+    ax1.plot( times, subdat['BX'], c='red', lw=1.5, label='BX' )
+    ax1.plot( times, subdat['BY'], c='green', lw=1.5, label='BY' )
+    ax1.plot( times, subdat['BZ'], c='blue', lw=1.5, label='BZ' )
+    ax1.set_ylabel('B (nT)')
+    ax1.legend(framealpha=0.5)
     
-    #ax0 = plt.subplot2grid(grid_size, (0,0), colspan=1)
-    #ax0.set_title(sc + f' ({times.shape[0]} pts)')
-    #ax0.plot( times, subdat['BX'], c='red', lw=1.5, label='BX' )
-    #ax0.plot( times, subdat['BY'], c='green', lw=1.5, label='BY' )
-    #ax0.plot( times, subdat['BZ'], c='blue', lw=1.5, label='BZ' )
-    #ax0.legend()
+    ax2.plot( times, subdat['VX'], c='red', lw=1.5, label='VX' )
+    ax2.plot( times, subdat['VY'], c='green', lw=1.5, label='VY' )
+    ax2.plot( times, subdat['VZ'], c='blue', lw=1.5, label='VZ' )
+    ax2.set_ylabel('V (km/s)')
+    ax2.legend(framealpha=0.5)
     
-    ax0 = plt.subplot2grid(grid_size, (0,0), colspan=1)
-    #ax0.set_title(sc + f' ({times.shape[0]} pts)')
-    ax0.plot( times, subdat['VX'], c='red', lw=1.5, label='VX' )
-    ax0.plot( times, subdat['VY'], c='green', lw=1.5, label='VY' )
-    ax0.plot( times, subdat['VZ'], c='blue', lw=1.5, label='VZ' )
-    ax0.legend()
+    ax3.plot( times, np.log10(subdat['T']) )
+    ax3.set_ylabel('T (eV)')
     
-    ax1 = plt.subplot2grid(grid_size, (1,0), colspan=1)
-    ax1.plot( times, np.log10(subdat['T']) )
-    ax1.set_ylabel('T')
+    ax4.plot( times, np.log10(subdat['n']) )
+    ax4.set_ylabel('n (#/cc)')
     
-    ax2 = plt.subplot2grid(grid_size, (2,0), colspan=1)
-    ax2.plot( times, np.log10(subdat['n']) )
-    ax2.set_ylabel('n')
+    # Create horizontal color bars to better show classifications
+    # time series
+    pred_types = np.unique(preds).tolist()
+    if -1 in pred_types: pred_types.remove(-1)
+    pred_type_colors = [ *plt.rcParams['axes.prop_cycle'].by_key()['color'] ]
+    pred_type_colors = pred_type_colors[:len(pred_types)]
+    for val in np.arange(len(pred_types)):
+        color = pred_type_colors[val]
+        axis_val = val / ( len(pred_types)-1 )
+        axvspan_shift = 0.1 / ( len(pred_types)-1 )
+        if val == 0:
+            ymin = axis_val
+            ymax = axis_val+1.75*axvspan_shift
+        elif val == max(pred_types):
+            ymin = axis_val-1.75*axvspan_shift
+            ymax = axis_val
+        else:
+            ymin = axis_val-axvspan_shift
+            ymax = axis_val+axvspan_shift
+        ax5.axvspan(times.iloc[0],
+                        times.iloc[-1],
+                        ymin = ymin,
+                        ymax = ymax,
+                        facecolor = color)
+        
+        # also scatter plot here to get colors?
+        if show_posit:
+            subpreds_mask = subpreds == val
+            ax6.scatter( subdat['X'][subpreds_mask],
+                         subdat['Y'][subpreds_mask],
+                         s=2, c=color )
+            ax7.scatter( subdat['X'][subpreds_mask],
+                         subdat['Z'][subpreds_mask],
+                         s=2, c=color )
     
-    ax3 = plt.subplot2grid(grid_size, (3,0), colspan=1)
-    ax3.plot( times, np.log10(subdat['MA']) )
-    ax3.set_ylabel('MA')
+    # plot actual time series of classifications as black line
+    ax5.plot( times, subpreds, c='black', lw=1.5 )
+    ax5.set_ylabel('class')
+    ax5.set_ylim( min(pred_types)-0.1, max(pred_types)+0.1 )
+
+
+    # Identify nodes in time series by drawing vertical lines at point
+    # belonging to given nodes
+    if len(identify_nodes) > 0:
+        
+        # check that node_dict was given
+        if node_dict is None:
+            raise ValueError('Must supply node_dict to identify nodes in'
+                             + ' time series (see function GMC.som_activations)')
+        
+        # identify points belonging to node that are within time frame ...
+        for node in identify_nodes:
+            inds = node_dict[node]
+            
+            node_mask = np.isin(inds, subdat.index.values)            
+            node_times = times.loc[ inds[node_mask] ]
+            
+            # ... then plot them on each axis
+            if node_mask.any():
+                for ax in [ax1, ax2, ax3, ax4, ax5]:
+                    for single_time in node_times:
+                        ax.axvline( single_time, lw=1, alpha=0.3 )
     
-    ax4 = plt.subplot2grid(grid_size, (4,0), colspan=1)
-    ax4.plot( times, subpreds )
-    ax4.set_ylabel('prediction')
+    ## determine date formatter
+    # hide time labels of all time series besides bottom plot
+    for ax in [ax1,ax2,ax3,ax4]:
+        ax.set_xticklabels([])
+    # if covers, multiple days then include day ...
+    if times.iloc[0].day != times.iloc[-1].day:
+        date_fmt = '%d %H:%M'
+    else:
+        date_fmt = '%H:%M'
+    # format dates
+    date_formatter = mdates.DateFormatter(date_fmt)
+    ax5.xaxis.set_major_formatter(date_formatter)
+    # rotate time labels
+    ax5.tick_params(axis='x', rotation=45)
     
-    """
-    ax4 = plt.subplot2grid(grid_size, (0,1), rowspan=2)
-    ax4.scatter( subdat['X'], subdat['Y'], s=50, c=np.arange(times.shape[0]),
-                 cmap='viridis')#, edgecolors='black' )
-    ax4.set_xlim(-25,25)
-    ax4.set_ylim(-25,25)
-    ax4_xticks = ax4.get_xticks()
-    ax4_xlabels = ax4.get_xticklabels()
-    ax4.set_title('X-Y (purple-to-yellow)')
+    # Extra work if having to show position plots
+    if show_posit:
+        
+        # hide x axis labels of x-y plot
+        ax6.set_xticklabels([])
+        
+        # show start and end of scatter plot
+        ax6.text( subdat['X'].iloc[0], subdat['Y'].iloc[0], '1')
+        ax6.text( subdat['X'].iloc[-1], subdat['Y'].iloc[-1], '2')
+        ax7.text( subdat['X'].iloc[0], subdat['Z'].iloc[0], '1')
+        ax7.text( subdat['X'].iloc[-1], subdat['Z'].iloc[-1], '2')
     
+        # also show markerx on x-y and y-z plots corresponding to time markers
+        ## Now THIS was tricky... matplotlib saves the tick info as the number
+        ## of *DAYS* since 1970.. so for each tick, need to ...
+        for tick in ax5.get_xticks():
+            # .. convert it to datetime object ..
+            tick_time = pd.to_datetime(tick, unit='d')
+            # .. find closest point in data ..
+            idx = np.argmin( np.abs(times - tick_time) )
+            # .. and plot marker for x-y ..
+            ax6.scatter( subdat['X'].iloc[idx],
+                         subdat['Y'].iloc[idx],
+                         facecolors='none',
+                         marker='o',
+                         edgecolors='black')
+            # .. and y-z
+            ax7.scatter( subdat['X'].iloc[idx],
+                         subdat['Z'].iloc[idx],
+                         facecolors='none',
+                         marker='o',
+                         edgecolors='black')
+
+    axes = [ax1, ax2, ax3, ax4, ax5]
+    if show_posit:
+        axes.extend( [ax6, ax7] )
     
-    ax5 = plt.subplot2grid(grid_size, (2,1), rowspan=2)
-    ax5.scatter( subdat['X'], subdat['Z'], s=50, c=np.arange(times.shape[0]),
-                 cmap='viridis' )
-    ax5.set_title('X-Z')
-    ax5.set_xlim( *ax4.get_xlim() )
-    ax5.set_ylim( -10, 10 )
-    """
-    
-    fig.autofmt_xdate()
-    fig.tight_layout()
-    
-    #ax5.set_xticks(ax4_xticks, [elem for elem in ax4_xticks])#ax6_xlabels)
-    
-    return fig
+    return subdat, (fig, axes)
 
 
 
