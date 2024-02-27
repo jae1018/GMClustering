@@ -868,12 +868,14 @@ class GMClustering:
             fig.colorbar(plot_ref, ax=ax)
             ax.set_title( plot_label )
             
-            # align x,y labels and add lines to grid
-            self._center_som_xy_labels(ax)
+            # dd lines to grid FIRST ...
             self._add_lines_to_grid(ax,
                                     shift = 0.5,
                                     line_kws = {'color' : 'black',
                                                 'lw'    : 0.01})
+            # ... THEN align x,y labels
+            self._center_som_xy_labels(ax)
+            
             
         ## hide remaining axes
         for ax_ind in range(last_ax_ind+1,axes.size):
