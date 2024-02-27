@@ -877,7 +877,7 @@ class GMClustering:
             
             
         ## hide remaining axes
-        for ax_ind in range(last_ax_ind+1,axes.size):
+        for ax_ind in range(last_ax_ind+1,axes_1d.size):
             axes_1d[ax_ind].axis("off")
         
         ## set fig title
