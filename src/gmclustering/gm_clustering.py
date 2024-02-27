@@ -394,13 +394,19 @@ class GMClustering:
         fig.colorbar(ref, ax=ax)
         
         # Add white gridlines to plot to make it sharper
+        """
         som_shape = self.som_shape()
         for i in range(1,som_shape[0]):
             for q in range(1,som_shape[1]):
                 ax.axvline(i-0.01, c='white', lw=0.1)  # add tiny shift 
                 ax.axhline(q, c='white', lw=0.1)
+        """
+        self._add_lines_to_grid(ax,
+                                line_kws = {'color' : 'white',
+                                            'lw'    : 0.1})
 
         # Shift x and y labels
+        """
         som_x_inds = np.arange(som_shape[0],step=2)
         ax.set_xticks( som_x_inds+0.5 )
         ax.set_xticklabels( som_x_inds )
@@ -408,6 +414,8 @@ class GMClustering:
         som_y_inds = np.arange(som_shape[1],step=2)
         ax.set_yticks( som_y_inds+0.5 )
         ax.set_yticklabels( som_y_inds )
+        """
+        self._center_som_xy_labels(ax)
         
         return fig, ax
     
@@ -420,6 +428,60 @@ class GMClustering:
         Returns 2d shape of SOM as 2-element integer tuple
         """
         return ( self.som._neigx.max()+1, self.som._neigy.max()+1 )
+    
+    
+    
+    
+    
+    def _add_lines_to_grid(self, ax,
+                                 shift    = None,
+                                 line_kws = None):
+        """
+        Adds horizontal and vertical black lines to the som grid
+
+        Parameters
+        ----------
+        ax : Matplotlib axis instance 
+            Axis instance that contains plot of SOM grid
+        """
+        if shift is None: shift = 0
+        if line_kws is None: line_kws = {}
+        
+        som_shape = self.som_shape()
+        for i in range(som_shape[0]):
+            for q in range(som_shape[1]):
+                ax.axvline(i+shift, **line_kws)
+                ax.axhline(i+shift, **line_kws)
+                
+                
+    
+    
+    
+    def _center_som_xy_labels(self, ax):
+        """
+        Makes the x,y labels of the SOM grid centered instead of left-oriented.
+        E.g. Makes it look like
+        
+          -----                               -----
+        0 |   |       ... instead of ...      |   |
+          -----                             0 -----
+            0                                 0   
+
+        Parameters
+        ----------
+        ax : Matplotlib axis instance 
+            Axis instance that contains plot of SOM grid
+        """
+        
+        som_shape = self.som_shape()
+        
+        som_x_inds = np.arange(som_shape[0],step=2)
+        ax.set_xticks( som_x_inds+0.5 )
+        ax.set_xticklabels( som_x_inds )
+        
+        som_y_inds = np.arange(som_shape[1],step=2)
+        ax.set_yticks( som_y_inds+0.5 )
+        ax.set_yticklabels( som_y_inds )
 
 
 
@@ -465,10 +527,16 @@ class GMClustering:
                          cmap   = cmap,
                          origin = 'lower')
         
+        """
         for i in range(som_shape[0]):
             for q in range(som_shape[1]):
                 ax.axvline(i+0.5, color='black', lw=0.01)
                 ax.axhline(i+0.5, color='black', lw=0.01)
+        """
+        self._add_lines_to_grid(ax,
+                                shift = 0.5,
+                                line_kws = {'color' : 'black',
+                                            'lw'    : 0.01})
         
         fig.colorbar(ref, ax=ax, ticks=np.unique(cmodel_preds), shrink=0.75)
         
@@ -799,6 +867,13 @@ class GMClustering:
             plot_ref = ax.pcolor( cvals.T, cmap=plot_data_cmap )
             fig.colorbar(plot_ref, ax=ax)
             ax.set_title( plot_label )
+            
+            # align x,y labels and add lines to grid
+            self._center_som_xy_labels(ax)
+            self._add_lines_to_grid(ax,
+                                    shift = 0.5,
+                                    line_kws = {'color' : 'black',
+                                                'lw'    : 0.01})
             
         ## hide remaining axes
         for ax_ind in range(last_ax_ind+1,axes.size):
