@@ -682,6 +682,135 @@ class GMClustering:
             node_dict[key] = np.array( list( som_preds[key].keys() ) )
         
         return node_dict
+    
+    
+    
+    
+    
+    def som_map(self,
+                data,
+                #plot_data = None,
+                feats = None,
+                u_mat = None,
+                hit_map = None,
+                som_kwargs = None,
+                hit_map_log = None,
+                plot_data_cmap = None,
+                fig_kws = None,
+                func_dict = None):
+    
+        """
+        som is instance of SOM
+        model_data is dataframe of data to feed to model
+        plot_data is df to be plotted on SOM node map
+        """
+        
+        if u_mat is None: u_mat = False
+        if hit_map is None: hit_map = False
+        if hit_map_log is None: hit_map_log = False
+        if plot_data_cmap is None: plot_data_cmap = plt.rcParams['image.cmap']
+        if fig_kws is None: fig_kws = {}
+        
+        
+        #if plot_data is not None:    
+        if feats is not None:
+            
+            # if given cols, extract columns from data
+            if isinstance(feats,list):
+                feats = data[feats]
+            
+            # otherwise, assume given separate dataframe;
+            # check that both feats and data have same number of rows
+            if feats.shape[0] != data.shape[0]:
+                raise ValueError('Number of points in feats and data'
+                                 +' must match')
+                
+            # set func_dict to be identity function for every label in plot_data
+            # that *IS NOT* already included in func_dict
+            if func_dict is None:
+                func_dict = {}
+            # assign remaining labels
+            for label in list(feats):
+                if label not in func_dict:
+                    func_dict[label] = lambda x: x
+        
+          
+        ## Determine number of plots to make and make them
+        num_plots = int(u_mat) + int(hit_map)
+        if feats is not None:
+            num_plots += feats.shape[1]
+        num_cols = int(np.ceil( np.sqrt(num_plots) ))
+        num_rows = int(np.ceil( num_plots / num_cols ))
+        fig, axes = plt.subplots(num_rows, num_cols, **fig_kws)
+        if num_plots == 1:
+            axes_1d = np.array([ axes ])
+        else:
+            axes_1d = axes.flatten()
+        last_ax_ind = num_plots - 1
+        current_ax_ind = 0
+        
+        ## track som shape
+        som_shape = self.som_shape()
+        
+        ## make u_mat if specified
+        if u_mat:
+            u_mat_plot = axes_1d[current_ax_ind].pcolor( self.som.distance_map().T,
+                                                         cmap='bone_r' )
+            fig.colorbar(u_mat_plot, ax=axes_1d[current_ax_ind])
+            axes_1d[current_ax_ind].set_title('U-matrix')
+            current_ax_ind += 1
+    
+    
+        
+    
+        ## make hit-map if specified
+        if hit_map:
+            # prepare data for som
+            som_dat = self._prepare_data_for_som(data)
+            # get counts
+            counts = self.som.activation_response( som_dat ).T
+            # normalize them rel to # of pts
+            counts_frac = 100 * counts / som_dat.shape[0]
+            # setup pcolor kwargs
+            pcolor_kwargs = {'cmap':'bone'}
+            if hit_map_log:
+                import matplotlib.colors as colors
+                pcolor_kwargs['norm'] = colors.LogNorm(vmin=counts_frac.min(),
+                                                       vmax=counts_frac.max())
+            hit_plot = axes_1d[current_ax_ind].pcolor(counts_frac,
+                                                      **pcolor_kwargs)
+            fig.colorbar(hit_plot, ax=axes_1d[current_ax_ind])
+            axes_1d[current_ax_ind].set_title('Hit-map (% of data)')
+            current_ax_ind += 1
+            
+        ## make remaining plots from plot_data
+        #ind_map = som_ind_map(som, model_data)
+        ind_map = self.som_activations(data)
+        for ax_ind in range(current_ax_ind,last_ax_ind+1):
+            ax = axes_1d[ax_ind]
+            plot_label = list(feats)[ last_ax_ind - ax_ind ]
+            # make array based on som nodes
+            cvals = np.zeros( som_shape )
+            # take mean of data under current label for all pts with this bmu
+            for bmu in ind_map:
+                bmu_data = feats.iloc[ind_map[bmu]][plot_label].values
+                cvals[bmu] = func_dict[plot_label]( np.mean( bmu_data ) )
+            
+            plot_ref = ax.pcolor( cvals.T, cmap=plot_data_cmap )
+            fig.colorbar(plot_ref, ax=ax)
+            ax.set_title( plot_label )
+            
+        ## hide remaining axes
+        for ax_ind in range(last_ax_ind+1,axes.size):
+            axes_1d[ax_ind].axis("off")
+        
+        ## set fig title
+        #title = str(som_shape) + ' map, {:.2f}M pts '.format( data.shape[0] / 10**6 )
+        #if som_kwargs is not None:
+        #    title += 'with params:\n' + str(som_kwargs)
+        #fig.suptitle(title)
+        
+        return fig, axes
         
         
         
