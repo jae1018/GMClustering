@@ -778,29 +778,26 @@ class GMClustering:
         if hit_map_log is None: hit_map_log = False
         if plot_data_cmap is None: plot_data_cmap = plt.rcParams['image.cmap']
         if fig_kws is None: fig_kws = {}
-        
-        
-        #if plot_data is not None:    
-        if feats is not None:
+        if feats is None: feats = list(data)[0]
             
-            # if given cols, extract columns from data
-            if isinstance(feats,list):
-                feats = data[feats]
+        # if given cols, extract columns from data
+        if isinstance(feats,list):
+            feats = data[feats]
+        
+        # otherwise, assume given separate dataframe;
+        # check that both feats and data have same number of rows
+        if feats.shape[0] != data.shape[0]:
+            raise ValueError('Number of points in feats and data'
+                             +' must match')
             
-            # otherwise, assume given separate dataframe;
-            # check that both feats and data have same number of rows
-            if feats.shape[0] != data.shape[0]:
-                raise ValueError('Number of points in feats and data'
-                                 +' must match')
-                
-            # set func_dict to be identity function for every label in plot_data
-            # that *IS NOT* already included in func_dict
-            if func_dict is None:
-                func_dict = {}
-            # assign remaining labels
-            for label in list(feats):
-                if label not in func_dict:
-                    func_dict[label] = lambda x: x
+        # set func_dict to be identity function for every label in plot_data
+        # that *IS NOT* already included in func_dict
+        if func_dict is None:
+            func_dict = {}
+        # assign remaining labels
+        for label in list(feats):
+            if label not in func_dict:
+                func_dict[label] = lambda x: x
         
           
         ## Determine number of plots to make and make them
@@ -817,8 +814,6 @@ class GMClustering:
         last_ax_ind = num_plots - 1
         current_ax_ind = 0
         
-        ## track som shape
-        som_shape = self.som_shape()
         
         ## make u_mat if specified
         if u_mat:
@@ -851,18 +846,22 @@ class GMClustering:
             axes_1d[current_ax_ind].set_title('Hit-map (% of data)')
             current_ax_ind += 1
             
+            
         ## make remaining plots from plot_data
-        #ind_map = som_ind_map(som, model_data)
         ind_map = self.som_activations(data)
         for ax_ind in range(current_ax_ind,last_ax_ind+1):
             ax = axes_1d[ax_ind]
             plot_label = list(feats)[ last_ax_ind - ax_ind ]
             # make array based on som nodes
-            cvals = np.zeros( som_shape )
+            cvals = np.zeros( self.som_shape() )
             # take mean of data under current label for all pts with this bmu
+            data_for_plot = feats[plot_label].values
+            func_for_plot = func_dict[plot_label]
             for bmu in ind_map:
-                bmu_data = feats.iloc[ind_map[bmu]][plot_label].values
-                cvals[bmu] = func_dict[plot_label]( np.mean( bmu_data ) )
+                #bmu_data = feats.iloc[ind_map[bmu]][plot_label].values
+                #cvals[bmu] = func_dict[plot_label]( np.mean( bmu_data ) )
+                bmu_data = data_for_plot[ ind_map[bmu] ]
+                cvals[bmu] = func_for_plot( np.mean( bmu_data ) )
             
             plot_ref = ax.pcolor( cvals.T, cmap=plot_data_cmap )
             fig.colorbar(plot_ref, ax=ax)
@@ -870,7 +869,7 @@ class GMClustering:
             
             # dd lines to grid FIRST ...
             self._add_lines_to_grid(ax,
-                                    shift = 0.5,
+                                    shift = 0,#0.5,
                                     line_kws = {'color' : 'black',
                                                 'lw'    : 0.01})
             # ... THEN align x,y labels
