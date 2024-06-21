@@ -19,7 +19,6 @@ if __name__ == "__main__":
     
     # get data
     dat = utils.load_example_data()
-    #dat = pd.read_csv('/home/jedmond/Documents/ML_Research/Source/gmclustering/GMClustering/src/gmclustering/data/mms1_2017.csv')
     
     # prepare clustering model
     gmc = GMClustering()
@@ -27,7 +26,7 @@ if __name__ == "__main__":
     # the SOM nodes are static and do not require data to
     # analyze in-of-themselves... so we can go ahead and inspect
     # the clustering solution on the SOM nodes
-    gmc.prepare_aggclust(dist=1.65)
+    gmc.prepare_aggclust()
     fig, axes = plt.subplots(1, 2, figsize=(8,4))
     gmc.plot_som_clust(ax=axes[0])
     dendrogram_kws = {'truncate_mode':'level', 'p':5}
